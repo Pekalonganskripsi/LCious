@@ -1,0 +1,465 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
+import { getApiBaseUrl } from '../config/api';
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Loader2,
+  Save,
+  Flame,
+  Candy,
+  Salad,
+  Sliders,
+} from 'lucide-react';
+
+function UserProfilePage() {
+  const navigate = useNavigate();
+  const { user, token, updateProfile } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+    // Preferences
+    pref_price_sensitivity: 'medium',
+    pref_max_distance_km: 10,
+    pref_spice_level: 0,
+    pref_sweetness_level: 0,
+    pref_savory_level: 0,
+  });
+
+  useEffect(() => {
+    if (user && user.role === 'customer') {
+      fetchCustomerProfile();
+    }
+  }, [user]);
+
+  const fetchCustomerProfile = async () => {
+    setIsLoading(true);
+    try {
+      const API_BASE = getApiBaseUrl();
+      const response = await fetch(`${API_BASE}/customers/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const customer = data.customer;
+        const preferences = data.preferences || {};
+
+        setFormData({
+          full_name: customer.full_name || '',
+          email: user.email,
+          phone: customer.phone || '',
+          address: customer.address || '',
+          latitude: customer.latitude || '',
+          longitude: customer.longitude || '',
+          pref_price_sensitivity: preferences.pref_price_sensitivity || 'medium',
+          pref_max_distance_km: preferences.pref_max_distance_km || 10,
+          pref_spice_level: preferences.pref_spice_level || 0,
+          pref_sweetness_level: preferences.pref_sweetness_level || 0,
+          pref_savory_level: preferences.pref_savory_level || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setMessage({ type: 'error', text: 'Gagal memuat profil' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaveLoading(true);
+    setMessage(null);
+
+    try {
+      const API_BASE = getApiBaseUrl();
+      const response = await fetch(`${API_BASE}/customers/me`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: formData.full_name,
+          phone: formData.phone,
+          address: formData.address,
+          latitude: formData.latitude || '-6.8889',
+          longitude: formData.longitude || '109.6756',
+          preferences: {
+            pref_price_sensitivity: formData.pref_price_sensitivity,
+            pref_max_distance_km: parseInt(formData.pref_max_distance_km),
+            pref_spice_level: parseInt(formData.pref_spice_level),
+            pref_sweetness_level: parseInt(formData.pref_sweetness_level),
+            pref_savory_level: parseInt(formData.pref_savory_level),
+          },
+        }),
+      });
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Profil berhasil diupdate!' });
+        setTimeout(() => {
+          setMessage(null);
+        }, 3000);
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.detail || 'Gagal mengupdate profil' });
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setMessage({ type: 'error', text: 'Gagal mengupdate profil' });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+
+  const handleCoordinateChange = (e) => {
+    const value = e.target.value;
+    // Cek apakah format adalah koordinat dari Google Maps (lat, lng)
+    const coordsPattern = /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/;
+    const match = value.match(coordsPattern);
+
+    if (match) {
+      // Jika format cocok, parse latitude dan longitude
+      const [, lat, lng] = match;
+      setFormData({
+        ...formData,
+        latitude: lat,
+        longitude: lng,
+      });
+    } else {
+      // Jika format tidak cocok, simpan sebagai latitude (backward compatibility)
+      setFormData({
+        ...formData,
+        latitude: value,
+      });
+    }
+  };
+
+  const getCoordinateDisplayValue = () => {
+    if (formData.latitude && formData.longitude) {
+      return `${formData.latitude}, ${formData.longitude}`;
+    }
+    return formData.latitude || '';
+  };
+
+  const handleGetMyLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setFormData({
+            ...formData,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+          });
+          setMessage({ type: 'success', text: '✅ Lokasi berhasil didapatkan!' });
+          setTimeout(() => setMessage(null), 3000);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          setMessage({ type: 'error', text: '❌ Gagal mendapatkan lokasi. Pastikan GPS aktif.' });
+          setTimeout(() => setMessage(null), 3000);
+        }
+      );
+    } else {
+      setMessage({ type: 'error', text: '❌ Browser tidak mendukung geolocation' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600">Memuat profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <h1 className="text-2xl font-bold text-gray-800">Profil Saya</h1>
+          <p className="text-sm text-gray-600">Kelola informasi dan preferensi kuliner Anda</p>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Sidebar - User Info Card */}
+          <div className="lg:col-span-1">
+            <div className="card-glass p-6 text-center">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-4xl font-bold mx-auto mb-4">
+                {formData.full_name.charAt(0).toUpperCase()}
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">{formData.full_name}</h2>
+              <p className="text-sm text-gray-600">{formData.email}</p>
+              <div className="mt-4 inline-block px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                Customer
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content - Form */}
+          <div className="lg:col-span-2 space-y-6">
+            {message && (
+              <div
+                className={`p-4 rounded-lg ${
+                  message.type === 'success'
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
+
+            {/* Personal Info */}
+            <div className="card-glass p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Informasi Pribadi
+              </h3>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nama Lengkap
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      disabled
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      No. Telepon
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Alamat
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Jl. Contoh No. 123"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Koordinat Lokasi
+                    </label>
+                    <input
+                      type="text"
+                      value={getCoordinateDisplayValue()}
+                      onChange={handleCoordinateChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="-6.951525762557895, 109.64974817723687"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Paste koordinat dari Google Maps (klik kanan pada lokasi di maps → copy)
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGetMyLocation}
+                      className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      Gunakan Lokasi Saya
+                    </button>
+                  </div>
+                </div>
+
+                {/* Taste Preferences */}
+                <div className="border-t border-gray-200 pt-6 mt-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <Sliders className="w-5 h-5" />
+                    Preferensi Rasa
+                  </h3>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-red-500" />
+                        Pedas (0-5)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        value={formData.pref_spice_level}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pref_spice_level: parseInt(e.target.value) })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.pref_spice_level === 0 && 'Tidak suka pedas'}
+                        {formData.pref_spice_level === 5 && 'Sangat suka pedas'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Candy className="w-4 h-4 text-pink-500" />
+                        Manis (0-5)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        value={formData.pref_sweetness_level}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pref_sweetness_level: parseInt(e.target.value) })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.pref_sweetness_level === 0 && 'Tidak suka manis'}
+                        {formData.pref_sweetness_level === 5 && 'Sangat suka manis'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Salad className="w-4 h-4 text-yellow-600" />
+                        Gurih (0-5)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        value={formData.pref_savory_level}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pref_savory_level: parseInt(e.target.value) })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.pref_savory_level === 0 && 'Tidak suka gurih'}
+                        {formData.pref_savory_level === 5 && 'Sangat suka gurih'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Other Preferences */}
+                <div className="border-t border-gray-200 pt-6 mt-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Preferensi Lainnya</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sensitivitas Harga
+                      </label>
+                      <select
+                        value={formData.pref_price_sensitivity}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pref_price_sensitivity: e.target.value })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="cheap">Murah (Low budget)</option>
+                        <option value="medium">Sedang (Medium budget)</option>
+                        <option value="expensive_flexible">Fleksibel</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Jarak Maksimal (km)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={formData.pref_max_distance_km}
+                        onChange={(e) =>
+                          setFormData({ ...formData, pref_max_distance_km: parseInt(e.target.value) })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saveLoading}
+                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg disabled:opacity-50"
+                  >
+                    {saveLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        Simpan Perubahan
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default UserProfilePage;

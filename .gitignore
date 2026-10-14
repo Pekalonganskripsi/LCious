@@ -1,0 +1,37 @@
+# Dependencies
+frontend/node_modules/
+backend/venv/
+node_modules/
+
+# Build output
+frontend/dist/
+build/
+
+# Environment & secrets
+.env
+*.env
+!.env.example
+
+# Databases (berisi data lokal)
+*.db
+*.sqlite
+*.sqlite3
+
+# User uploads
+backend/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

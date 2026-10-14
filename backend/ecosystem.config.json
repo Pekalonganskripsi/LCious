@@ -1,0 +1,23 @@
+{
+  "apps": [
+    {
+      "name": "licious-backend",
+      "script": "./start.sh",
+      "cwd": "/media/devmon/sdb1-ata-RESCUE09RM22AR12/www/LCicious/backend",
+      "instances": 1,
+      "exec_mode": "fork",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "error_file": "/media/devmon/sdb1-ata-RESCUE09RM22AR12/www/LCicious/logs/pm2-error.log",
+      "out_file": "/media/devmon/sdb1-ata-RESCUE09RM22AR12/www/LCicious/logs/pm2-access.log",
+      "log_date_format": "YYYY-MM-DD HH:mm:ss",
+      "merge_logs": true,
+      "autorestart": true,
+      "max_restarts": 10,
+      "min_uptime": "10s",
+      "max_memory_restart": "500M",
+      "watch": false
+    }
+  ]
+}
